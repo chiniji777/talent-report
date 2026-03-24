@@ -19,14 +19,14 @@ import {
 } from "recharts";
 import { StatCard } from "../components/StatCard";
 import { api } from "../api";
-import type { DashboardStats } from "../types";
+import type { DashboardResponse } from "../types";
 
 const fmtNum = (n: number) => n.toLocaleString("th-TH");
 const fmtMoney = (n: number) =>
   n.toLocaleString("th-TH", { minimumFractionDigits: 2 });
 
 export function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [year, setYear] = useState(new Date().getFullYear());
@@ -38,8 +38,8 @@ export function DashboardPage() {
     const params = new URLSearchParams({ year: String(year) });
     if (month > 0) params.set("month", String(month));
     api
-      .get<DashboardStats>(`/api/reports/dashboard?${params}`)
-      .then(setStats)
+      .get<DashboardResponse>(`/api/reports/dashboard?${params}`)
+      .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [year, month]);
@@ -58,7 +58,9 @@ export function DashboardPage() {
       </div>
     );
   }
-  if (!stats) return null;
+  if (!data) return null;
+
+  const { stats, salespersons, topCustomers, monthlyTrend } = data;
 
   return (
     <div className="space-y-6">
@@ -109,7 +111,7 @@ export function DashboardPage() {
         <StatCard
           icon={TrendingUp}
           label="ยอดขายรวม"
-          value={fmtMoney(stats.total_sales)}
+          value={fmtMoney(stats.total_amount)}
           color="primary"
         />
         <StatCard
@@ -127,7 +129,7 @@ export function DashboardPage() {
         <StatCard
           icon={Receipt}
           label="จำนวน Invoice"
-          value={fmtNum(stats.invoice_count)}
+          value={fmtNum(stats.total_invoices)}
         />
         <StatCard
           icon={CheckCircle}
@@ -150,9 +152,9 @@ export function DashboardPage() {
         </h3>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={stats.monthly_data}>
+            <BarChart data={monthlyTrend}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="month_name" tick={{ fill: "#94a3b8", fontSize: 12 }} />
+              <XAxis dataKey="month" tick={{ fill: "#94a3b8", fontSize: 12 }} />
               <YAxis tick={{ fill: "#94a3b8", fontSize: 12 }} />
               <Tooltip
                 contentStyle={{
@@ -161,19 +163,13 @@ export function DashboardPage() {
                   borderRadius: "8px",
                   color: "#f1f5f9",
                 }}
-                formatter={(value: number) => fmtMoney(value)}
+                formatter={(v) => v != null ? fmtMoney(Number(v)) : ""}
               />
               <Legend />
               <Bar
-                dataKey="paid"
-                name="ชำระแล้ว"
-                fill="#22c55e"
-                radius={[4, 4, 0, 0]}
-              />
-              <Bar
-                dataKey="unpaid"
-                name="ค้างชำระ"
-                fill="#ef4444"
+                dataKey="total_amount"
+                name="ยอดขาย"
+                fill="#3b82f6"
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>
@@ -207,7 +203,7 @@ export function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {stats.top_customers.map((c, i) => (
+                {topCustomers.map((c, i) => (
                   <tr key={i} className="border-b border-slate-700/50">
                     <td className="px-4 py-2 text-slate-500">{i + 1}</td>
                     <td className="px-4 py-2 text-slate-300 truncate max-w-48">
@@ -244,25 +240,25 @@ export function DashboardPage() {
                     ยอดขาย
                   </th>
                   <th className="px-4 py-2 text-right text-xs text-slate-500">
-                    IV
+                    บิล
                   </th>
                   <th className="px-4 py-2 text-right text-xs text-slate-500">
-                    IS
+                    ชำระแล้ว
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {stats.salesperson_summary.map((s, i) => (
+                {salespersons.map((s, i) => (
                   <tr key={i} className="border-b border-slate-700/50">
-                    <td className="px-4 py-2 text-slate-300">{s.salesperson}</td>
+                    <td className="px-4 py-2 text-slate-300">{s.nickname}</td>
                     <td className="px-4 py-2 text-right text-slate-300">
-                      {fmtMoney(s.total_sales)}
+                      {fmtMoney(s.total)}
+                    </td>
+                    <td className="px-4 py-2 text-right text-slate-400">
+                      {s.invoice_count}
                     </td>
                     <td className="px-4 py-2 text-right text-success">
-                      {s.iv_count}
-                    </td>
-                    <td className="px-4 py-2 text-right text-warning">
-                      {s.is_count}
+                      {fmtMoney(s.paid_amount)}
                     </td>
                   </tr>
                 ))}

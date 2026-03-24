@@ -10,11 +10,31 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { api } from "../api";
-import type { BackupSlot, DbInfo } from "../types";
+
+interface BackupEntry {
+  slot: number;
+  filename: string;
+  exists: boolean;
+  size?: number;
+  modified?: string;
+  isCurrent?: boolean;
+}
+
+interface BackupsResponse {
+  backups: BackupEntry[];
+  meta: { last_date: string; last_slot: number };
+  preRestore: { size: number; modified: string } | null;
+  currentDbSize: number;
+}
+
+const fmtSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 export function SettingsPage() {
-  const [backups, setBackups] = useState<BackupSlot[]>([]);
-  const [dbInfo, setDbInfo] = useState<DbInfo | null>(null);
+  const [data, setData] = useState<BackupsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState("");
   const [message, setMessage] = useState<{
@@ -24,13 +44,9 @@ export function SettingsPage() {
 
   const fetchData = () => {
     setLoading(true);
-    Promise.all([
-      api.get<{ backups: BackupSlot[]; db_info: DbInfo }>("/api/db/backups"),
-    ])
-      .then(([data]) => {
-        setBackups(data.backups);
-        setDbInfo(data.db_info);
-      })
+    api
+      .get<BackupsResponse>("/api/db/backups")
+      .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
   };
@@ -127,27 +143,21 @@ export function SettingsPage() {
       )}
 
       {/* DB Info */}
-      {dbInfo && (
+      {data && (
         <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
           <div className="flex items-center gap-3 mb-3">
             <HardDrive className="w-5 h-5 text-primary" />
             <h3 className="font-medium">ข้อมูลฐานข้อมูล</h3>
           </div>
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-slate-500">ขนาด</p>
-              <p className="text-slate-200">{dbInfo.size}</p>
+              <p className="text-slate-500">ขนาดฐานข้อมูล</p>
+              <p className="text-slate-200">{fmtSize(data.currentDbSize)}</p>
             </div>
             <div>
-              <p className="text-slate-500">จำนวน Invoice</p>
+              <p className="text-slate-500">สำรองล่าสุด</p>
               <p className="text-slate-200">
-                {dbInfo.invoice_count.toLocaleString("th-TH")}
-              </p>
-            </div>
-            <div>
-              <p className="text-slate-500">จำนวนสินค้า</p>
-              <p className="text-slate-200">
-                {dbInfo.product_count.toLocaleString("th-TH")}
+                {data.meta.last_date || "ยังไม่เคยสำรอง"}
               </p>
             </div>
           </div>
@@ -175,24 +185,29 @@ export function SettingsPage() {
           <p className="text-slate-400 text-sm">กำลังโหลด...</p>
         ) : (
           <div className="space-y-2">
-            {backups.length === 0 ? (
-              <p className="text-slate-400 text-sm py-4 text-center">
-                ยังไม่มีข้อมูลสำรอง
-              </p>
-            ) : (
-              backups.map((b) => (
-                <div
-                  key={b.slot}
-                  className="flex items-center justify-between bg-slate-900 rounded-lg px-4 py-3"
-                >
-                  <div>
-                    <p className="text-sm text-slate-300">
-                      Slot {b.slot} — {b.filename}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {b.size} • {b.created_at}
-                    </p>
-                  </div>
+            {(data?.backups || []).map((b) => (
+              <div
+                key={b.slot}
+                className="flex items-center justify-between bg-slate-900 rounded-lg px-4 py-3"
+              >
+                <div>
+                  <p className="text-sm text-slate-300">
+                    Slot {b.slot} — {b.filename}
+                    {b.isCurrent && (
+                      <span className="ml-2 text-xs text-primary">(ล่าสุด)</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {b.exists
+                      ? `${fmtSize(b.size || 0)} • ${
+                          b.modified
+                            ? new Date(b.modified).toLocaleString("th-TH")
+                            : ""
+                        }`
+                      : "ว่าง"}
+                  </p>
+                </div>
+                {b.exists && (
                   <button
                     onClick={() => handleRestore(b.slot)}
                     disabled={actionLoading === `restore-${b.slot}`}
@@ -203,9 +218,9 @@ export function SettingsPage() {
                       ? "กำลังกู้คืน..."
                       : "กู้คืน"}
                   </button>
-                </div>
-              ))
-            )}
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>

@@ -10,7 +10,10 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { api } from "../api";
-import type { ReportMonthly, ReportSalesperson } from "../types";
+import type {
+  ReportMonthlyResponse,
+  ReportSalespersonResponse,
+} from "../types";
 
 const fmtMoney = (n: number) =>
   n.toLocaleString("th-TH", { minimumFractionDigits: 2 });
@@ -20,8 +23,8 @@ type Tab = "monthly" | "salesperson";
 export function ReportsPage() {
   const [tab, setTab] = useState<Tab>("monthly");
   const [year, setYear] = useState(new Date().getFullYear());
-  const [monthly, setMonthly] = useState<ReportMonthly[]>([]);
-  const [salesperson, setSalesperson] = useState<ReportSalesperson[]>([]);
+  const [monthlyData, setMonthlyData] = useState<ReportMonthlyResponse | null>(null);
+  const [spData, setSpData] = useState<ReportSalespersonResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,14 +32,14 @@ export function ReportsPage() {
     const params = `?year=${year}`;
     if (tab === "monthly") {
       api
-        .get<ReportMonthly[]>(`/api/reports/monthly${params}`)
-        .then(setMonthly)
+        .get<ReportMonthlyResponse>(`/api/reports/monthly${params}`)
+        .then(setMonthlyData)
         .catch(() => {})
         .finally(() => setLoading(false));
     } else {
       api
-        .get<ReportSalesperson[]>(`/api/reports/salesperson${params}`)
-        .then(setSalesperson)
+        .get<ReportSalespersonResponse>(`/api/reports/salesperson${params}`)
+        .then(setSpData)
         .catch(() => {})
         .finally(() => setLoading(false));
     }
@@ -56,7 +59,8 @@ export function ReportsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const totalMonthly = monthly.reduce((s, m) => s + m.total, 0);
+  const months = monthlyData?.months || [];
+  const customers = spData?.customers || [];
 
   return (
     <div className="space-y-6">
@@ -72,9 +76,7 @@ export function ReportsPage() {
               { length: 5 },
               (_, i) => new Date().getFullYear() - i
             ).map((y) => (
-              <option key={y} value={y}>
-                {y + 543}
-              </option>
+              <option key={y} value={y}>{y + 543}</option>
             ))}
           </select>
           <button
@@ -91,7 +93,7 @@ export function ReportsPage() {
       <div className="flex gap-1 bg-slate-800 rounded-lg p-1 w-fit">
         {[
           { key: "monthly" as Tab, label: "รายเดือน" },
-          { key: "salesperson" as Tab, label: "ตามพนักงาน" },
+          { key: "salesperson" as Tab, label: "ตามลูกค้า" },
         ].map((t) => (
           <button
             key={t.key}
@@ -115,10 +117,10 @@ export function ReportsPage() {
           <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthly}>
+                <BarChart data={months}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis
-                    dataKey="month_name"
+                    dataKey="month"
                     tick={{ fill: "#94a3b8", fontSize: 12 }}
                   />
                   <YAxis tick={{ fill: "#94a3b8", fontSize: 12 }} />
@@ -129,10 +131,9 @@ export function ReportsPage() {
                       borderRadius: "8px",
                       color: "#f1f5f9",
                     }}
-                    formatter={(v: number) => fmtMoney(v)}
+                    formatter={(v) => v != null ? fmtMoney(Number(v)) : ""}
                   />
-                  <Bar dataKey="iv_total" name="IV" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="is_total" name="IS" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="total" name="ยอดรวม" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -143,47 +144,38 @@ export function ReportsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-700">
-                  <th className="px-4 py-3 text-left text-xs text-slate-500">
-                    เดือน
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-500">
-                    IV
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-500">
-                    IS
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-500">
-                    รวม
-                  </th>
+                  <th className="px-4 py-3 text-left text-xs text-slate-500">เดือน</th>
+                  <th className="px-4 py-3 text-right text-xs text-slate-500">บิล</th>
+                  <th className="px-4 py-3 text-right text-xs text-slate-500">มูลค่า</th>
+                  <th className="px-4 py-3 text-right text-xs text-slate-500">VAT</th>
+                  <th className="px-4 py-3 text-right text-xs text-slate-500">รวม</th>
                 </tr>
               </thead>
               <tbody>
-                {monthly.map((m) => (
+                {months.map((m) => (
                   <tr key={m.month} className="border-b border-slate-700/50">
-                    <td className="px-4 py-2 text-slate-300">{m.month_name}</td>
-                    <td className="px-4 py-2 text-right text-success">
-                      {fmtMoney(m.iv_total)}
-                    </td>
-                    <td className="px-4 py-2 text-right text-warning">
-                      {fmtMoney(m.is_total)}
-                    </td>
-                    <td className="px-4 py-2 text-right text-slate-200 font-medium">
-                      {fmtMoney(m.total)}
-                    </td>
+                    <td className="px-4 py-2 text-slate-300">{m.month}</td>
+                    <td className="px-4 py-2 text-right text-slate-400">{m.invoice_count}</td>
+                    <td className="px-4 py-2 text-right text-slate-300">{fmtMoney(m.subtotal)}</td>
+                    <td className="px-4 py-2 text-right text-slate-400">{fmtMoney(m.vat)}</td>
+                    <td className="px-4 py-2 text-right text-slate-200 font-medium">{fmtMoney(m.total)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t border-slate-600">
                   <td className="px-4 py-3 font-semibold">รวมทั้งปี</td>
-                  <td className="px-4 py-3 text-right text-success font-semibold">
-                    {fmtMoney(monthly.reduce((s, m) => s + m.iv_total, 0))}
+                  <td className="px-4 py-3 text-right text-slate-400 font-semibold">
+                    {months.reduce((s, m) => s + m.invoice_count, 0)}
                   </td>
-                  <td className="px-4 py-3 text-right text-warning font-semibold">
-                    {fmtMoney(monthly.reduce((s, m) => s + m.is_total, 0))}
+                  <td className="px-4 py-3 text-right text-slate-300 font-semibold">
+                    {fmtMoney(months.reduce((s, m) => s + m.subtotal, 0))}
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-400 font-semibold">
+                    {fmtMoney(months.reduce((s, m) => s + m.vat, 0))}
                   </td>
                   <td className="px-4 py-3 text-right text-primary font-bold">
-                    {fmtMoney(totalMonthly)}
+                    {fmtMoney(months.reduce((s, m) => s + m.total, 0))}
                   </td>
                 </tr>
               </tfoot>
@@ -195,59 +187,38 @@ export function ReportsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-700">
-                <th className="px-4 py-3 text-left text-xs text-slate-500">
-                  พนักงาน
-                </th>
-                <th className="px-4 py-3 text-right text-xs text-slate-500">
-                  IV
-                </th>
-                <th className="px-4 py-3 text-right text-xs text-slate-500">
-                  IS
-                </th>
-                <th className="px-4 py-3 text-right text-xs text-slate-500">
-                  รวม
-                </th>
-                <th className="px-4 py-3 text-right text-xs text-slate-500">
-                  บิล
-                </th>
+                <th className="px-4 py-3 text-left text-xs text-slate-500">ลูกค้า</th>
+                <th className="px-4 py-3 text-right text-xs text-slate-500">บิล</th>
+                <th className="px-4 py-3 text-right text-xs text-slate-500">มูลค่า</th>
+                <th className="px-4 py-3 text-right text-xs text-slate-500">รวม</th>
+                <th className="px-4 py-3 text-right text-xs text-slate-500">แต้ม</th>
               </tr>
             </thead>
             <tbody>
-              {salesperson.map((s) => (
-                <tr
-                  key={s.salesperson}
-                  className="border-b border-slate-700/50"
-                >
-                  <td className="px-4 py-2 text-slate-300">{s.salesperson}</td>
-                  <td className="px-4 py-2 text-right text-success">
-                    {fmtMoney(s.iv_total)}
-                  </td>
-                  <td className="px-4 py-2 text-right text-warning">
-                    {fmtMoney(s.is_total)}
-                  </td>
-                  <td className="px-4 py-2 text-right text-slate-200 font-medium">
-                    {fmtMoney(s.total)}
-                  </td>
-                  <td className="px-4 py-2 text-right text-slate-400">
-                    {s.invoice_count}
-                  </td>
+              {customers.map((c) => (
+                <tr key={c.customer_name} className="border-b border-slate-700/50">
+                  <td className="px-4 py-2 text-slate-300 truncate max-w-64">{c.customer_name}</td>
+                  <td className="px-4 py-2 text-right text-slate-400">{c.invoice_count}</td>
+                  <td className="px-4 py-2 text-right text-slate-300">{fmtMoney(c.subtotal)}</td>
+                  <td className="px-4 py-2 text-right text-slate-200 font-medium">{fmtMoney(c.total)}</td>
+                  <td className="px-4 py-2 text-right text-primary">{c.points || 0}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="border-t border-slate-600">
                 <td className="px-4 py-3 font-semibold">รวม</td>
-                <td className="px-4 py-3 text-right text-success font-semibold">
-                  {fmtMoney(salesperson.reduce((s, r) => s + r.iv_total, 0))}
+                <td className="px-4 py-3 text-right text-slate-400 font-semibold">
+                  {customers.reduce((s, c) => s + c.invoice_count, 0)}
                 </td>
-                <td className="px-4 py-3 text-right text-warning font-semibold">
-                  {fmtMoney(salesperson.reduce((s, r) => s + r.is_total, 0))}
+                <td className="px-4 py-3 text-right text-slate-300 font-semibold">
+                  {fmtMoney(customers.reduce((s, c) => s + c.subtotal, 0))}
                 </td>
                 <td className="px-4 py-3 text-right text-primary font-bold">
-                  {fmtMoney(salesperson.reduce((s, r) => s + r.total, 0))}
+                  {fmtMoney(customers.reduce((s, c) => s + c.total, 0))}
                 </td>
-                <td className="px-4 py-3 text-right text-slate-400 font-semibold">
-                  {salesperson.reduce((s, r) => s + r.invoice_count, 0)}
+                <td className="px-4 py-3 text-right text-primary font-semibold">
+                  {customers.reduce((s, c) => s + (c.points || 0), 0)}
                 </td>
               </tr>
             </tfoot>

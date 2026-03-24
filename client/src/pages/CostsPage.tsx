@@ -10,58 +10,65 @@ import {
 } from "lucide-react";
 import { StatCard } from "../components/StatCard";
 import { api } from "../api";
-import type { CostProduct, CostSummary } from "../types";
+import type { CostProduct, CostSummary, CostsProductsResponse } from "../types";
 
 const fmtMoney = (n: number | null) =>
   n !== null ? n.toLocaleString("th-TH", { minimumFractionDigits: 2 }) : "-";
 
-type FilterTab = "all" | "with_cost" | "no_cost" | "no_commission";
+type FilterTab = "all" | "has_cost" | "no_cost" | "no_commission";
 
 export function CostsPage() {
   const [products, setProducts] = useState<CostProduct[]>([]);
   const [summary, setSummary] = useState<CostSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
-  const fetchData = () => {
+  const fetchProducts = () => {
     setLoading(true);
-    Promise.all([
-      api.get<CostProduct[]>("/api/costs/products"),
-      api.get<CostSummary>("/api/costs/summary"),
-    ])
-      .then(([p, s]) => {
-        setProducts(p);
-        setSummary(s);
+    const params = new URLSearchParams({ page: String(page), per_page: "50" });
+    if (filterTab !== "all") params.set("filter", filterTab);
+    api
+      .get<CostsProductsResponse>(`/api/costs/products?${params}`)
+      .then((res) => {
+        setProducts(res.products);
+        setTotalPages(res.total_pages);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   };
 
+  const fetchSummary = () => {
+    api.get<CostSummary>("/api/costs/summary").then(setSummary).catch(() => {});
+  };
+
   useEffect(() => {
-    fetchData();
+    fetchProducts();
+  }, [filterTab, page]);
+
+  useEffect(() => {
+    fetchSummary();
   }, []);
 
-  const filtered = products.filter((p) => {
-    if (filterTab === "with_cost") return p.cost_price !== null;
-    if (filterTab === "no_cost") return p.cost_price === null;
-    if (filterTab === "no_commission") return p.no_commission;
-    return true;
-  });
-
   const startEdit = (product: CostProduct) => {
-    setEditingId(product.id);
+    setEditingCode(product.product_code);
     setEditValue(product.cost_price?.toString() || "");
   };
 
-  const saveEdit = async (id: number) => {
+  const saveEdit = async (code: string) => {
     try {
-      await api.put(`/api/costs/products/${id}`, {
-        cost_price: editValue ? Number(editValue) : null,
+      const product = products.find((p) => p.product_code === code);
+      await api.put(`/api/costs/products/${code}`, {
+        name: product?.name || "",
+        unit: product?.unit || "",
+        std_price: editValue || null,
       });
-      setEditingId(null);
-      fetchData();
+      setEditingCode(null);
+      fetchProducts();
+      fetchSummary();
     } catch {
       // handle error silently
     }
@@ -74,7 +81,8 @@ export function CostsPage() {
     fd.append("file", file);
     try {
       await api.upload("/api/costs/import", fd);
-      fetchData();
+      fetchProducts();
+      fetchSummary();
     } catch {
       // handle error
     }
@@ -126,18 +134,18 @@ export function CostsPage() {
           <StatCard
             icon={Package}
             label="สินค้าทั้งหมด"
-            value={summary.total_products}
+            value={summary.product_count}
           />
           <StatCard
             icon={DollarSign}
             label="มีต้นทุน"
-            value={summary.with_cost}
+            value={summary.item_codes_with_cost}
             color="success"
           />
           <StatCard
             icon={AlertTriangle}
             label="ไม่มีต้นทุน"
-            value={summary.missing_cost}
+            value={summary.item_codes_missing}
             color="danger"
           />
           <StatCard
@@ -153,13 +161,16 @@ export function CostsPage() {
       <div className="flex gap-1 bg-slate-800 rounded-lg p-1 w-fit">
         {[
           { key: "all" as FilterTab, label: "ทั้งหมด" },
-          { key: "with_cost" as FilterTab, label: "มีต้นทุน" },
+          { key: "has_cost" as FilterTab, label: "มีต้นทุน" },
           { key: "no_cost" as FilterTab, label: "ไม่มีต้นทุน" },
           { key: "no_commission" as FilterTab, label: "ไม่คิดคอม" },
         ].map((t) => (
           <button
             key={t.key}
-            onClick={() => setFilterTab(t.key)}
+            onClick={() => {
+              setFilterTab(t.key);
+              setPage(1);
+            }}
             className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
               filterTab === t.key
                 ? "bg-primary text-white"
@@ -177,45 +188,38 @@ export function CostsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-700">
-                <th className="px-4 py-3 text-left text-xs text-slate-500">
-                  รหัส
-                </th>
-                <th className="px-4 py-3 text-left text-xs text-slate-500">
-                  ชื่อสินค้า
-                </th>
-                <th className="px-4 py-3 text-left text-xs text-slate-500">
-                  หน่วย
-                </th>
-                <th className="px-4 py-3 text-right text-xs text-slate-500">
-                  ราคาต้นทุน
-                </th>
-                <th className="px-4 py-3 text-center text-xs text-slate-500">
-                  ไม่คิดคอม
-                </th>
+                <th className="px-4 py-3 text-left text-xs text-slate-500">รหัส</th>
+                <th className="px-4 py-3 text-left text-xs text-slate-500">ชื่อสินค้า</th>
+                <th className="px-4 py-3 text-left text-xs text-slate-500">หน่วย</th>
+                <th className="px-4 py-3 text-right text-xs text-slate-500">ราคาต้นทุน</th>
+                <th className="px-4 py-3 text-center text-xs text-slate-500">ไม่คิดคอม</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-12 text-center text-slate-400"
-                  >
+                  <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
                     กำลังโหลด...
                   </td>
                 </tr>
+              ) : products.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
+                    ไม่พบข้อมูล
+                  </td>
+                </tr>
               ) : (
-                filtered.map((p) => (
-                  <tr key={p.id} className="border-b border-slate-700/50">
+                products.map((p) => (
+                  <tr key={p.product_code} className="border-b border-slate-700/50">
                     <td className="px-4 py-2 text-slate-300 font-mono text-xs">
                       {p.product_code}
                     </td>
                     <td className="px-4 py-2 text-slate-300 max-w-64 truncate">
-                      {p.product_name}
+                      {p.name}
                     </td>
                     <td className="px-4 py-2 text-slate-400">{p.unit}</td>
                     <td className="px-4 py-2 text-right">
-                      {editingId === p.id ? (
+                      {editingCode === p.product_code ? (
                         <div className="flex items-center justify-end gap-1">
                           <input
                             type="number"
@@ -224,18 +228,18 @@ export function CostsPage() {
                             className="w-24 bg-slate-900 border border-primary rounded px-2 py-1 text-right text-sm text-white focus:outline-none"
                             autoFocus
                             onKeyDown={(e) => {
-                              if (e.key === "Enter") saveEdit(p.id);
-                              if (e.key === "Escape") setEditingId(null);
+                              if (e.key === "Enter") saveEdit(p.product_code);
+                              if (e.key === "Escape") setEditingCode(null);
                             }}
                           />
                           <button
-                            onClick={() => saveEdit(p.id)}
+                            onClick={() => saveEdit(p.product_code)}
                             className="p-1 text-success hover:bg-success/10 rounded"
                           >
                             <Check className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => setEditingId(null)}
+                            onClick={() => setEditingCode(null)}
                             className="p-1 text-slate-400 hover:bg-slate-700 rounded"
                           >
                             <X className="w-3.5 h-3.5" />
@@ -245,9 +249,7 @@ export function CostsPage() {
                         <span
                           onClick={() => startEdit(p)}
                           className={`cursor-pointer hover:text-primary transition-colors ${
-                            p.cost_price === null
-                              ? "text-danger"
-                              : "text-slate-300"
+                            p.cost_price === null ? "text-danger" : "text-slate-300"
                           }`}
                         >
                           {fmtMoney(p.cost_price)}
@@ -255,7 +257,7 @@ export function CostsPage() {
                       )}
                     </td>
                     <td className="px-4 py-2 text-center">
-                      {p.no_commission && (
+                      {p.no_commission === 1 && (
                         <span className="text-warning text-xs">ไม่คิด</span>
                       )}
                     </td>
@@ -265,6 +267,31 @@ export function CostsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700">
+            <span className="text-xs text-slate-400">
+              หน้า {page} จาก {totalPages}
+            </span>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setPage(page - 1)}
+                disabled={page <= 1}
+                className="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ก่อนหน้า
+              </button>
+              <button
+                onClick={() => setPage(page + 1)}
+                disabled={page >= totalPages}
+                className="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ถัดไป
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

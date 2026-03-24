@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 import { DataTable, type Column } from "../components/DataTable";
 import { api } from "../api";
-import type { Invoice, PaginatedResponse } from "../types";
+import type { Invoice, InvoicesResponse } from "../types";
 
 const fmtMoney = (n: number) =>
   n.toLocaleString("th-TH", { minimumFractionDigits: 2 });
 
 const fmtDate = (d: string) => {
+  if (!d) return "";
   const date = new Date(d);
   return date.toLocaleDateString("th-TH");
 };
@@ -16,17 +17,17 @@ const fmtDate = (d: string) => {
 const columns: Column<Invoice>[] = [
   { key: "invoice_no", label: "เลขที่" },
   {
-    key: "type",
+    key: "invoice_type",
     label: "ประเภท",
     render: (row) => (
       <span
         className={`px-2 py-0.5 rounded text-xs font-medium ${
-          row.type === "IV"
+          row.invoice_type === "IV"
             ? "bg-success/10 text-success"
             : "bg-warning/10 text-warning"
         }`}
       >
-        {row.type}
+        {row.invoice_type}
       </span>
     ),
   },
@@ -48,12 +49,12 @@ const columns: Column<Invoice>[] = [
     render: (row) => (
       <span
         className={`px-2 py-0.5 rounded text-xs font-medium ${
-          row.is_paid
+          row.is_paid === "Y"
             ? "bg-success/10 text-success"
             : "bg-danger/10 text-danger"
         }`}
       >
-        {row.is_paid ? "ชำระแล้ว" : "ค้างชำระ"}
+        {row.is_paid === "Y" ? "ชำระแล้ว" : "ค้างชำระ"}
       </span>
     ),
   },
@@ -62,7 +63,7 @@ const columns: Column<Invoice>[] = [
 
 export function InvoicesPage() {
   const navigate = useNavigate();
-  const [data, setData] = useState<PaginatedResponse<Invoice> | null>(null);
+  const [data, setData] = useState<InvoicesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [salesperson, setSalesperson] = useState("");
@@ -86,7 +87,7 @@ export function InvoicesPage() {
     if (month > 0) params.set("month", String(month));
 
     api
-      .get<PaginatedResponse<Invoice>>(`/api/invoices?${params}`)
+      .get<InvoicesResponse>(`/api/invoices?${params}`)
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -171,33 +172,19 @@ export function InvoicesPage() {
         >
           <option value={0}>ทุกเดือน</option>
           {[
-            "ม.ค.",
-            "ก.พ.",
-            "มี.ค.",
-            "เม.ย.",
-            "พ.ค.",
-            "มิ.ย.",
-            "ก.ค.",
-            "ส.ค.",
-            "ก.ย.",
-            "ต.ค.",
-            "พ.ย.",
-            "ธ.ค.",
+            "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+            "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
           ].map((m, i) => (
-            <option key={i} value={i + 1}>
-              {m}
-            </option>
+            <option key={i} value={i + 1}>{m}</option>
           ))}
         </select>
       </div>
 
-      <DataTable
+      <DataTable<Invoice>
         columns={columns}
-        data={(data?.data || []) as unknown as Record<string, unknown>[]}
+        data={data?.invoices || []}
         loading={loading}
-        onRowClick={(row) =>
-          navigate(`/invoices/${(row as unknown as Invoice).id}`)
-        }
+        onRowClick={(row) => navigate(`/invoices/${row.id}`)}
         page={data?.page || 1}
         totalPages={data?.total_pages || 1}
         onPageChange={setPage}

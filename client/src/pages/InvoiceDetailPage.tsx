@@ -2,22 +2,22 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, FileText } from "lucide-react";
 import { api } from "../api";
-import type { InvoiceDetail } from "../types";
+import type { InvoiceDetailResponse } from "../types";
 
-const fmtMoney = (n: number) =>
-  n.toLocaleString("th-TH", { minimumFractionDigits: 2 });
-const fmtDate = (d: string) => new Date(d).toLocaleDateString("th-TH");
+const fmtMoney = (n: number | null) =>
+  n != null ? n.toLocaleString("th-TH", { minimumFractionDigits: 2 }) : "-";
+const fmtDate = (d: string) => (d ? new Date(d).toLocaleDateString("th-TH") : "");
 
 export function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
+  const [data, setData] = useState<InvoiceDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     api
-      .get<InvoiceDetail>(`/api/invoices/${id}`)
-      .then(setInvoice)
+      .get<InvoiceDetailResponse>(`/api/invoices/${id}`)
+      .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [id]);
@@ -29,7 +29,7 @@ export function InvoiceDetailPage() {
       </div>
     );
   }
-  if (error || !invoice) {
+  if (error || !data?.invoice) {
     return (
       <div className="text-center py-12">
         <p className="text-danger mb-4">{error || "ไม่พบข้อมูล"}</p>
@@ -39,6 +39,8 @@ export function InvoiceDetailPage() {
       </div>
     );
   }
+
+  const { invoice, items } = data;
 
   return (
     <div className="space-y-6">
@@ -64,12 +66,12 @@ export function InvoiceDetailPage() {
               <p className="text-xs text-slate-500">ประเภท</p>
               <span
                 className={`px-2 py-0.5 rounded text-xs font-medium ${
-                  invoice.type === "IV"
+                  invoice.invoice_type === "IV"
                     ? "bg-success/10 text-success"
                     : "bg-warning/10 text-warning"
                 }`}
               >
-                {invoice.type}
+                {invoice.invoice_type}
               </span>
             </div>
             <div>
@@ -80,12 +82,12 @@ export function InvoiceDetailPage() {
               <p className="text-xs text-slate-500">สถานะ</p>
               <span
                 className={`px-2 py-0.5 rounded text-xs font-medium ${
-                  invoice.is_paid
+                  invoice.is_paid === "Y"
                     ? "bg-success/10 text-success"
                     : "bg-danger/10 text-danger"
                 }`}
               >
-                {invoice.is_paid ? "ชำระแล้ว" : "ค้างชำระ"}
+                {invoice.is_paid === "Y" ? "ชำระแล้ว" : "ค้างชำระ"}
               </span>
             </div>
             <div>
@@ -112,7 +114,7 @@ export function InvoiceDetailPage() {
       <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-700">
           <h3 className="text-sm font-medium text-slate-400">
-            รายการสินค้า ({invoice.items.length} รายการ)
+            รายการสินค้า ({items.length} รายการ)
           </h3>
         </div>
         <div className="overflow-x-auto">
@@ -120,17 +122,8 @@ export function InvoiceDetailPage() {
             <thead>
               <tr className="border-b border-slate-700">
                 {[
-                  "#",
-                  "รหัส",
-                  "รายละเอียด",
-                  "จำนวน",
-                  "หน่วย",
-                  "ราคา/หน่วย",
-                  "ส่วนลด",
-                  "จำนวนเงิน",
-                  "ต้นทุน",
-                  "กำไร",
-                  "แต้ม",
+                  "#", "รหัส", "รายละเอียด", "จำนวน", "หน่วย",
+                  "ราคา/หน่วย", "ส่วนลด", "จำนวนเงิน", "ต้นทุน", "กำไร", "แต้ม",
                 ].map((h) => (
                   <th
                     key={h}
@@ -142,11 +135,8 @@ export function InvoiceDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {invoice.items.map((item) => (
-                <tr
-                  key={item.line_no}
-                  className="border-b border-slate-700/50"
-                >
+              {items.map((item) => (
+                <tr key={item.line_no} className="border-b border-slate-700/50">
                   <td className="px-3 py-2 text-slate-500">{item.line_no}</td>
                   <td className="px-3 py-2 text-slate-300 font-mono text-xs">
                     {item.product_code}
@@ -155,7 +145,7 @@ export function InvoiceDetailPage() {
                     {item.description}
                   </td>
                   <td className="px-3 py-2 text-right text-slate-300">
-                    {item.qty}
+                    {item.quantity}
                   </td>
                   <td className="px-3 py-2 text-slate-400">{item.unit}</td>
                   <td className="px-3 py-2 text-right text-slate-300">
@@ -172,13 +162,15 @@ export function InvoiceDetailPage() {
                   </td>
                   <td
                     className={`px-3 py-2 text-right font-medium ${
-                      item.profit >= 0 ? "text-success" : "text-danger"
+                      item.line_profit != null && item.line_profit >= 0
+                        ? "text-success"
+                        : "text-danger"
                     }`}
                   >
-                    {fmtMoney(item.profit)}
+                    {fmtMoney(item.line_profit)}
                   </td>
                   <td className="px-3 py-2 text-right text-primary">
-                    {item.points}
+                    {item.line_points != null ? item.line_points : "-"}
                   </td>
                 </tr>
               ))}
