@@ -1,8 +1,8 @@
-import Database from 'better-sqlite3'
+import { Database } from 'bun:sqlite'
 import path from 'path'
 import fs from 'fs'
 
-let db: Database.Database | null = null
+let db: Database | null = null
 let dataPath = ''
 
 export function initDb(dataDirPath: string): void {
@@ -17,8 +17,8 @@ export function initDb(dataDirPath: string): void {
 
   const dbPath = path.join(dataPath, 'talent.db')
   db = new Database(dbPath)
-  db.pragma('journal_mode = WAL')
-  db.pragma('foreign_keys = ON')
+  db.exec('PRAGMA journal_mode = WAL')
+  db.exec('PRAGMA foreign_keys = ON')
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS salesperson (
@@ -115,7 +115,7 @@ export function initDb(dataDirPath: string): void {
   }
 }
 
-export function getDb(): Database.Database {
+export function getDb(): Database {
   if (!db) throw new Error('Database not initialized')
   return db
 }

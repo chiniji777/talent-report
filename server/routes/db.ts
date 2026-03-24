@@ -26,7 +26,7 @@ dbRoutes.get('/backups', (c) => {
 dbRoutes.post('/backup', (c) => {
   try {
     const db = getDb()
-    db.pragma('wal_checkpoint(TRUNCATE)')
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
     const dataPath = getDataPath()
     const result = backupNow(dataPath)
     return c.json(result)
@@ -44,13 +44,13 @@ dbRoutes.post('/restore/:slot', (c) => {
   try {
     const dataPath = getDataPath()
     const db = getDb()
-    db.pragma('wal_checkpoint(TRUNCATE)')
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
     db.close()
 
     const result = restoreBackup(dataPath, slotNum)
     initDb(dataPath)
     const newDb = getDb()
-    const check = newDb.pragma('integrity_check') as any[]
+    const check = newDb.query('PRAGMA integrity_check').all() as any[]
     if (!check || check[0]?.integrity_check !== 'ok') {
       return c.json({ success: false, error: 'ฐานข้อมูลที่กู้คืนเสียหาย กรุณาลองใหม่' }, 500)
     }
@@ -67,7 +67,7 @@ dbRoutes.get('/export', (c) => {
     const dataPath = getDataPath()
     const dbPath = path.join(dataPath, 'talent.db')
     const db = getDb()
-    db.pragma('wal_checkpoint(TRUNCATE)')
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
 
     const fileBuffer = fs.readFileSync(dbPath)
     return new Response(fileBuffer, {
@@ -95,7 +95,7 @@ dbRoutes.post('/import', async (c) => {
     const preRestorePath = path.join(dataPath, 'talent_pre_restore.db')
 
     const db = getDb()
-    db.pragma('wal_checkpoint(TRUNCATE)')
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
     db.close()
 
     // Save current DB before replacing
@@ -110,7 +110,7 @@ dbRoutes.post('/import', async (c) => {
     // Re-init and verify integrity
     initDb(dataPath)
     const newDb = getDb()
-    const check = newDb.pragma('integrity_check') as any[]
+    const check = newDb.query('PRAGMA integrity_check').all() as any[]
     if (!check || check[0]?.integrity_check !== 'ok') {
       newDb.close()
       if (fs.existsSync(preRestorePath)) {

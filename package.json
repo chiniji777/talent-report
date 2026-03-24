@@ -7,14 +7,12 @@
     "start": "NODE_ENV=production bun run server/index.ts"
   },
   "dependencies": {
-    "better-sqlite3": "^11.0.0",
     "hono": "^4.0.0",
     "iconv-lite": "^0.6.3",
     "jsonwebtoken": "^9.0.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.0",
     "@types/jsonwebtoken": "^9.0.0",
     "typescript": "^5.0.0"
   }
