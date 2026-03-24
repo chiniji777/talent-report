@@ -23,8 +23,9 @@ initDb(dataPath)
 runBackup(dataPath)
 
 // CORS
+const CORS_ORIGIN = process.env.CORS_ORIGIN || 'https://talent.thinkfirst-solution.com'
 app.use('*', cors({
-  origin: '*',
+  origin: CORS_ORIGIN,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
 }))

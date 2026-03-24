@@ -2,7 +2,11 @@ import { Hono } from 'hono'
 import jwt from 'jsonwebtoken'
 import type { Context, Next } from 'hono'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'talent-report-secret-key-change-in-production'
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) throw new Error('JWT_SECRET env var is required')
+
+const ADMIN_USER = process.env.ADMIN_USER || 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS || 'admin'
 
 const auth = new Hono()
 
@@ -10,7 +14,7 @@ auth.post('/login', async (c) => {
   const body = await c.req.json()
   const { username, password } = body
 
-  if (username === 'admin' && password === 'admin') {
+  if (username === ADMIN_USER && password === ADMIN_PASS) {
     const token = jwt.sign({ username, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' })
     return c.json({ success: true, token })
   }
