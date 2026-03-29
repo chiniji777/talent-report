@@ -18,12 +18,12 @@ export function StatCard({ icon: Icon, label, value, color = "primary" }: StatCa
   return (
     <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
       <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorMap[color]}`}>
+        <div className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center ${colorMap[color]}`}>
           <Icon className="w-5 h-5" />
         </div>
-        <div className="min-w-0">
-          <p className="text-xs text-slate-400 truncate">{label}</p>
-          <p className="text-lg font-bold text-slate-100 truncate">
+        <div className="min-w-0 overflow-hidden">
+          <p className="text-xs text-slate-400 whitespace-nowrap overflow-hidden text-ellipsis">{label}</p>
+          <p className="text-base sm:text-lg font-bold text-slate-100 whitespace-nowrap">
             {typeof value === "number" ? value.toLocaleString("th-TH") : value}
           </p>
         </div>
