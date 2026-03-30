@@ -82,7 +82,9 @@ reportRoutes.get('/dashboard', (c) => {
       COALESCE(SUM(CASE WHEN i.is_cancelled = 0 THEN i.vat ELSE 0 END), 0) as vat,
       COALESCE(SUM(CASE WHEN i.is_cancelled = 0 THEN i.total ELSE 0 END), 0) as total,
       COALESCE(SUM(CASE WHEN i.is_paid = 'Y' AND i.is_cancelled = 0 THEN i.total ELSE 0 END), 0) as paid_amount,
-      COALESCE(SUM(CASE WHEN i.is_paid != 'Y' AND i.is_cancelled = 0 THEN i.total ELSE 0 END), 0) as unpaid_amount
+      COALESCE(SUM(CASE WHEN i.is_paid != 'Y' AND i.is_cancelled = 0 THEN i.total ELSE 0 END), 0) as unpaid_amount,
+      COUNT(CASE WHEN i.invoice_type = 'IS' AND i.is_cancelled = 0 THEN 1 END) as credit_note_count,
+      COALESCE(SUM(CASE WHEN i.invoice_type = 'IS' AND i.is_cancelled = 0 THEN i.total ELSE 0 END), 0) as credit_note_amount
     FROM salesperson s
     LEFT JOIN import_batch ib ON ib.salesperson_id = s.id
     LEFT JOIN invoice i ON i.batch_id = ib.id${spDateOn}
@@ -141,7 +143,8 @@ reportRoutes.get('/dashboard', (c) => {
         ELSE 0 END
       ) as total_points,
       SUM(ii.amount - (ii.quantity * p.std_price)) as total_profit,
-      SUM(ii.quantity * p.std_price) as total_cost
+      SUM(ii.quantity * p.std_price) as total_cost,
+      SUM(ii.amount) as qualified_revenue
     FROM invoice_item ii
     JOIN invoice inv ON ii.invoice_id = inv.id
     JOIN product p ON ii.product_code = p.code AND p.std_price IS NOT NULL
@@ -155,7 +158,8 @@ reportRoutes.get('/dashboard', (c) => {
           (CAST(((ii.amount - p.std_price * ii.quantity)) / 100 AS INTEGER) * 100) / 1000.0
         ELSE 0 END
       ) as total_points,
-      SUM(ii.amount - (ii.quantity * p.std_price)) as profit
+      SUM(ii.amount - (ii.quantity * p.std_price)) as profit,
+      SUM(ii.amount) as qualified_revenue
     FROM invoice_item ii
     JOIN invoice inv ON ii.invoice_id = inv.id
     JOIN product p ON ii.product_code = p.code AND p.std_price IS NOT NULL
@@ -167,12 +171,13 @@ reportRoutes.get('/dashboard', (c) => {
 
   const spExtraMap: Record<string, any> = {}
   spPoints.forEach(r => {
-    spExtraMap[r.nickname] = { total_points: r.total_points || 0, profit: r.profit || 0 }
+    spExtraMap[r.nickname] = { total_points: r.total_points || 0, profit: r.profit || 0, qualified_revenue: r.qualified_revenue || 0 }
   })
   salespersons.forEach(sp => {
     const ex = spExtraMap[sp.nickname] || {}
     sp.total_points = ex.total_points || 0
     sp.profit = ex.profit || 0
+    sp.qualified_revenue = ex.qualified_revenue || 0
   })
 
   let monthlyTrend: any[] = []
@@ -234,6 +239,7 @@ reportRoutes.get('/dashboard', (c) => {
       total_points: (pointsRow && pointsRow.total_points) || 0,
       total_profit: (pointsRow && pointsRow.total_profit) || 0,
       total_cost: (pointsRow && pointsRow.total_cost) || 0,
+      qualified_revenue: (pointsRow && pointsRow.qualified_revenue) || 0,
       paid_amount: payStats.paid_amount || 0,
       paid_count: payStats.paid_count || 0,
       unpaid_amount: payStats.unpaid_amount || 0,

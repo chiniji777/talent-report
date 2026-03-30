@@ -28,15 +28,15 @@ export function DataTable<T extends Record<string, any>>({
   loading,
 }: DataTableProps<T>) {
   return (
-    <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+    <div className="glass-card overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-700">
+            <tr style={{ borderBottom: "1px solid rgba(148, 163, 184, 0.06)" }}>
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className={`px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider ${col.className || ""}`}
+                  className={`px-4 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider ${col.className || ""}`}
                 >
                   {col.label}
                 </th>
@@ -48,16 +48,19 @@ export function DataTable<T extends Record<string, any>>({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-12 text-center text-slate-400"
+                  className="px-4 py-16 text-center"
                 >
-                  กำลังโหลด...
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                    <span className="text-slate-500 text-sm">กำลังโหลด...</span>
+                  </div>
                 </td>
               </tr>
             ) : data.length === 0 ? (
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-12 text-center text-slate-400"
+                  className="px-4 py-16 text-center text-slate-500"
                 >
                   ไม่พบข้อมูล
                 </td>
@@ -67,11 +70,10 @@ export function DataTable<T extends Record<string, any>>({
                 <tr
                   key={i}
                   onClick={() => onRowClick?.(row)}
-                  className={`border-b border-slate-700/50 ${
-                    onRowClick
-                      ? "cursor-pointer hover:bg-slate-750"
-                      : ""
+                  className={`table-row-hover ${
+                    onRowClick ? "cursor-pointer" : ""
                   }`}
+                  style={{ borderBottom: "1px solid rgba(148, 163, 184, 0.04)" }}
                 >
                   {columns.map((col) => (
                     <td
@@ -91,22 +93,22 @@ export function DataTable<T extends Record<string, any>>({
       </div>
 
       {page !== undefined && totalPages !== undefined && onPageChange && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700">
-          <span className="text-xs text-slate-400">
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid rgba(148, 163, 184, 0.06)" }}>
+          <span className="text-xs text-slate-500">
             หน้า {page} จาก {totalPages}
           </span>
           <div className="flex gap-1">
             <button
               onClick={() => onPageChange(page - 1)}
               disabled={page <= 1}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={() => onPageChange(page + 1)}
               disabled={page >= totalPages}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight className="w-4 h-4" />
             </button>

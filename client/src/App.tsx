@@ -10,27 +10,34 @@ import { ReportsPage } from "./pages/ReportsPage";
 import { CostsPage } from "./pages/CostsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
+  const { isAuthenticated, isAdmin } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (adminOnly && !isAdmin) return <Navigate to="/import" replace />;
   return <Layout>{children}</Layout>;
 }
 
+function DefaultRedirect() {
+  const { isAuthenticated, isAdmin } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <Navigate to={isAdmin ? "/" : "/import"} replace />;
+}
+
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isAdmin } = useAuth();
 
   return (
     <Routes>
       <Route
         path="/login"
         element={
-          isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />
+          isAuthenticated ? <Navigate to={isAdmin ? "/" : "/import"} replace /> : <LoginPage />
         }
       />
       <Route
         path="/"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute adminOnly>
             <DashboardPage />
           </ProtectedRoute>
         }
@@ -62,7 +69,7 @@ function AppRoutes() {
       <Route
         path="/reports"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute adminOnly>
             <ReportsPage />
           </ProtectedRoute>
         }
@@ -70,7 +77,7 @@ function AppRoutes() {
       <Route
         path="/costs"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute adminOnly>
             <CostsPage />
           </ProtectedRoute>
         }
@@ -83,7 +90,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<DefaultRedirect />} />
     </Routes>
   );
 }

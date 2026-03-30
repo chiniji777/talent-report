@@ -123,7 +123,7 @@ costRoutes.post('/import', async (c) => {
         if (isNaN(price)) { skipped++; continue }
 
         const noComRaw = String(row['ไม่คิดคอม'] || '').trim()
-        const noCommission = (noComRaw === 'ใช่' || noComRaw.toUpperCase() === 'Y') ? 1 : 0
+        const noCommission = (noComRaw === 'ใช่' || noComRaw.toUpperCase() === 'Y' || noComRaw === '1') ? 1 : 0
 
         const existing = checkExisting.get(code)
         upsert.run(code, name, unit, price, noCommission)
@@ -155,7 +155,7 @@ costRoutes.get('/export', (c) => {
 
   const wsData = [['รหัสสินค้า', 'ชื่อสินค้า', 'หน่วย', 'ราคาต่อหน่วย', 'ไม่คิดคอม']]
   for (const p of allProducts) {
-    wsData.push([p.product_code, p.name, p.unit, p.price, p.no_commission ? 'Y' : 'N'])
+    wsData.push([p.product_code, p.name, p.unit, p.price, p.no_commission ? '1' : ''])
   }
 
   const wb = XLSX.utils.book_new()
@@ -173,6 +173,35 @@ costRoutes.get('/export', (c) => {
   })
 })
 
+// PUT /api/costs/products/batch — batch update
+costRoutes.put('/products/batch', async (c) => {
+  try {
+    const db = getDb()
+    const items = await c.req.json() as any[]
+
+    const update = db.prepare(
+      'UPDATE product SET name = ?, unit = ?, std_price = ?, no_commission = ? WHERE code = ?'
+    )
+
+    let count = 0
+    const updateAll = db.transaction(() => {
+      for (const item of items) {
+        const priceVal = (item.std_price === '' || item.std_price === null || item.std_price === undefined)
+          ? null
+          : parseFloat(item.std_price)
+        const noComVal = item.no_commission ? 1 : 0
+        update.run(item.name || '', item.unit || '', (priceVal !== null && !isNaN(priceVal)) ? priceVal : null, noComVal, item.code)
+        count++
+      }
+    })
+    updateAll()
+
+    return c.json({ success: true, count })
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500)
+  }
+})
+
 // PUT /api/costs/products/:code — update single
 costRoutes.put('/products/:code', async (c) => {
   try {
@@ -188,7 +217,7 @@ costRoutes.put('/products/:code', async (c) => {
       : parseFloat(std_price)
 
     db.prepare(
-      'UPDATE product SET name = ?, unit = ?, std_price = ? WHERE code = ?'
+      'UPDATE product SET name = ?, unit = ?, std_price = ?, no_commission = ? WHERE code = ?'
     ).run(name || '', unit || '', (priceVal !== null && !isNaN(priceVal)) ? priceVal : null, code)
 
     return c.json({ success: true })
@@ -197,37 +226,7 @@ costRoutes.put('/products/:code', async (c) => {
   }
 })
 
-// PUT /api/costs/products/batch — batch update
-costRoutes.put('/products/batch', async (c) => {
-  try {
-    const db = getDb()
-    const items = await c.req.json() as any[]
 
-    const update = db.prepare(
-      'UPDATE product SET name = ?, unit = ?, std_price = ? WHERE code = ?'
-    )
-
-    let count = 0
-    const updateAll = db.transaction(() => {
-      for (const item of items) {
-        const priceVal = (item.std_price === '' || item.std_price === null || item.std_price === undefined)
-          ? null
-          : parseFloat(item.std_price)
-        update.run(
-          item.name || '', item.unit || '',
-          (priceVal !== null && !isNaN(priceVal)) ? priceVal : null,
-          item.code
-        )
-        count++
-      }
-    })
-    updateAll()
-
-    return c.json({ success: true, count })
-  } catch (err: any) {
-    return c.json({ success: false, error: err.message }, 500)
-  }
-})
 
 // PATCH /api/costs/products/:code/commission — toggle
 costRoutes.patch('/products/:code/commission', async (c) => {

@@ -84,6 +84,11 @@ invoiceRoutes.get('/', (c) => {
     args.push(is_paid)
   }
 
+  const has_loss = query.has_loss
+  if (has_loss === 'Y') {
+    where.push('ic.loss_item_count > 0')
+  }
+
   const whereClause = where.join(' AND ')
 
   const countRow = db.prepare(`
@@ -91,6 +96,13 @@ invoiceRoutes.get('/', (c) => {
     FROM invoice i
     LEFT JOIN import_batch ib ON i.batch_id = ib.id
     LEFT JOIN salesperson s ON ib.salesperson_id = s.id
+    LEFT JOIN (
+      SELECT ii2.invoice_id,
+        SUM(CASE WHEN (ii2.amount - (ii2.quantity * p2.std_price)) < 0 THEN 1 ELSE 0 END) as loss_item_count
+      FROM invoice_item ii2
+      JOIN product p2 ON ii2.product_code = p2.code AND p2.std_price IS NOT NULL
+      GROUP BY ii2.invoice_id
+    ) ic ON ic.invoice_id = i.id
     WHERE ${whereClause}
   `).get(...args) as any
   const total = countRow.total
@@ -99,18 +111,21 @@ invoiceRoutes.get('/', (c) => {
 
   const invoices = db.prepare(`
     SELECT i.*, s.nickname as salesperson,
-      ic.total_cost, ic.total_points
+      ic.total_cost, ic.total_points, ic.total_profit, ic.qualified_revenue, ic.loss_item_count
     FROM invoice i
     LEFT JOIN import_batch ib ON i.batch_id = ib.id
     LEFT JOIN salesperson s ON ib.salesperson_id = s.id
     LEFT JOIN (
       SELECT ii.invoice_id,
         SUM(ii.quantity * p.std_price) as total_cost,
+        SUM(ii.amount) as qualified_revenue,
+        SUM(ii.amount - (ii.quantity * p.std_price)) as total_profit,
         SUM(
           CASE WHEN COALESCE(p.no_commission, 0) = 0 THEN
             (CAST(((ii.amount - p.std_price * ii.quantity)) / 100 AS INTEGER) * 100) / 1000.0
           ELSE 0 END
-        ) as total_points
+        ) as total_points,
+        SUM(CASE WHEN (ii.amount - (ii.quantity * p.std_price)) < 0 THEN 1 ELSE 0 END) as loss_item_count
       FROM invoice_item ii
       JOIN product p ON ii.product_code = p.code AND p.std_price IS NOT NULL
       GROUP BY ii.invoice_id

@@ -49,16 +49,29 @@ export function FileDropzone({
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+        className={`relative rounded-2xl p-10 text-center transition-all duration-300 ${
           isDragging
-            ? "border-primary bg-primary/5"
-            : "border-slate-600 hover:border-slate-500"
+            ? "border-blue-500/40 scale-[1.01]"
+            : "border-slate-600/30 hover:border-slate-500/30"
         }`}
+        style={{
+          border: isDragging ? "2px dashed rgba(59, 130, 246, 0.4)" : "2px dashed rgba(148, 163, 184, 0.15)",
+          background: isDragging
+            ? "radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.06) 0%, transparent 70%)"
+            : "radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.3) 0%, transparent 70%)",
+        }}
       >
-        <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-        <p className="text-slate-300 mb-1">ลากไฟล์มาวางที่นี่</p>
-        <p className="text-slate-500 text-sm mb-3">หรือ</p>
-        <label className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg cursor-pointer transition-colors text-sm">
+        <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{
+          background: "linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.05) 100%)",
+        }}>
+          <Upload className={`w-6 h-6 transition-colors ${isDragging ? "text-blue-400" : "text-slate-400"}`} />
+        </div>
+        <p className="text-slate-300 mb-1 font-medium">ลากไฟล์มาวางที่นี่</p>
+        <p className="text-slate-500 text-sm mb-4">หรือ</p>
+        <label className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl cursor-pointer transition-all text-sm font-medium btn-press hover:shadow-lg" style={{
+          background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+          boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
+        }}>
           <Upload className="w-4 h-4" />
           เลือกไฟล์
           <input
@@ -76,9 +89,14 @@ export function FileDropzone({
           {files.map((file, i) => (
             <div
               key={i}
-              className="flex items-center gap-3 bg-slate-800 rounded-lg px-4 py-2 border border-slate-700"
+              className="flex items-center gap-3 glass-card-sm px-4 py-3 animate-fade-in-up"
+              style={{ animationDelay: `${i * 50}ms` }}
             >
-              <File className="w-4 h-4 text-primary shrink-0" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{
+                background: "linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(99, 102, 241, 0.08) 100%)"
+              }}>
+                <File className="w-4 h-4 text-blue-400" />
+              </div>
               <span className="text-sm text-slate-300 truncate flex-1">
                 {file.name}
               </span>
@@ -87,7 +105,7 @@ export function FileDropzone({
               </span>
               <button
                 onClick={() => removeFile(i)}
-                className="p-1 text-slate-400 hover:text-danger"
+                className="p-1 text-slate-500 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/[0.06]"
               >
                 <X className="w-4 h-4" />
               </button>

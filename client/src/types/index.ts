@@ -16,6 +16,7 @@ export interface DashboardResponse {
     total_points: number;
     total_profit: number;
     total_cost: number;
+    qualified_revenue: number;
     paid_amount: number;
     paid_count: number;
     unpaid_amount: number;
@@ -31,6 +32,10 @@ export interface DashboardResponse {
     codes_with_cost: number;
     codes_missing: number;
   };
+  topProductsBySalesperson: {
+    salesperson: string;
+    products: TopProduct[];
+  }[];
 }
 
 export interface MonthlyTrend {
@@ -65,6 +70,7 @@ export interface SalespersonSummary {
   unpaid_amount: number;
   total_points: number;
   profit: number;
+  qualified_revenue: number;
 }
 
 // GET /api/invoices response
@@ -115,13 +121,19 @@ export interface ImportPreview {
   period: string;
   new_count: number;
   duplicate_count: number;
+  paid_update_count: number;
   total_amount: number;
+  mismatch_count: number;
+  mismatches: { invoice_no: string; field: string; existing: number | string; incoming: number | string }[];
 }
 
 export interface ImportResult {
   imported: number;
   skipped: number;
+  paid_updated: number;
   errors: string[];
+  warnings: string[];
+  warning_count: number;
 }
 
 // GET /api/costs/products response
