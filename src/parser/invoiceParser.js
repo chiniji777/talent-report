@@ -60,8 +60,10 @@ function parseCsvLine(line) {
         current += ch;
       }
     } else {
-      if (ch === '"') {
+      if (ch === '"' && current === '') {
         inQuotes = true;
+      } else if (ch === '"') {
+        current += ch;
       } else if (ch === ',') {
         cols.push(current);
         current = '';
